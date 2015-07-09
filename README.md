@@ -1,6 +1,6 @@
 # RxJava FileUtils
 
-String operators for [RxJava](https://github.com/ReactiveX/RxJava).
+File utility operators for [RxJava](https://github.com/ReactiveX/RxJava).
 
 ## Master Build Status
 
@@ -12,24 +12,23 @@ String operators for [RxJava](https://github.com/ReactiveX/RxJava).
 - Twitter: [@RxJava](http://twitter.com/RxJava)
 - [GitHub Issues](https://github.com/ReactiveX/RxJavaFileUtils/issues)
 
-
 ## Binaries
 
-Binaries and dependency information for Maven, Ivy, Gradle and others can be found at [http://search.maven.org](http://search.maven.org/#search%7Cga%7C1%7Cio.reactivex.rxjava-string).
+Binaries and dependency information for Maven, Ivy, Gradle and others can be found at [http://search.maven.org](http://search.maven.org/#search%7Cga%7C1%7Cio.reactivex.rxjava-file-utils).
 
 Example for Maven:
 
 ```xml
 <dependency>
     <groupId>io.reactivex</groupId>
-    <artifactId>rxjava-string</artifactId>
+    <artifactId>rxjava-file-utils</artifactId>
     <version>x.y.z</version>
 </dependency>
 ```
 and for Ivy:
 
 ```xml
-<dependency org="io.reactivex" name="rxjava-string" rev="x.y.z" />
+<dependency org="io.reactivex" name="rxjava-file-utils" rev="x.y.z" />
 ```
 
 ## Build
