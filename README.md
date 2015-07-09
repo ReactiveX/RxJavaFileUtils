@@ -16,7 +16,13 @@ File utility operators for [RxJava](https://github.com/ReactiveX/RxJava).
 
 Binaries and dependency information for Maven, Ivy, Gradle and others can be found at [http://search.maven.org](http://search.maven.org/#search%7Cga%7C1%7Cio.reactivex.rxjava-file-utils).
 
-Example for Maven:
+Example for Gradle:
+
+```groovy
+compile 'io.reactivex:rxjava-file-utils:x.y.z'
+```
+
+and for Maven:
 
 ```xml
 <dependency>
@@ -29,6 +35,18 @@ and for Ivy:
 
 ```xml
 <dependency org="io.reactivex" name="rxjava-file-utils" rev="x.y.z" />
+```
+
+Snapshots are available via [JFrog](https://oss.jfrog.org/webapp/search/artifact/?5&q=rxjava-file-utils):
+
+```groovy
+repositories {
+    maven { url 'https://oss.jfrog.org/libs-snapshot' }
+}
+
+dependencies {
+    compile 'io.reactivex:rxjava-file-utils:x.y.z-SNAPSHOT'
+}
 ```
 
 ## Build
