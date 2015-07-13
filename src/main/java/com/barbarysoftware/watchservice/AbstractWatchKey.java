@@ -25,14 +25,18 @@
 
 package com.barbarysoftware.watchservice;
 
+import java.nio.file.WatchEvent;
+import java.nio.file.WatchKey;
 import java.util.ArrayList;
 import java.util.List;
+
+import static java.nio.file.StandardWatchEventKinds.OVERFLOW;
 
 /**
  * Base implementation class for watch keys.
  */
 
-abstract class AbstractWatchKey extends WatchKey {
+abstract class AbstractWatchKey implements WatchKey {
 
     /**
      * Maximum size of event list (in the future this may be tunable)
@@ -42,8 +46,8 @@ abstract class AbstractWatchKey extends WatchKey {
     /**
      * Special event to signal overflow
      */
-    static final Event<Void> OVERFLOW_EVENT =
-            new Event<Void>(StandardWatchEventKind.OVERFLOW, null);
+    static final Event<Object> OVERFLOW_EVENT =
+            new Event<>(OVERFLOW, null);
 
     /**
      * Possible key states
@@ -95,7 +99,7 @@ abstract class AbstractWatchKey extends WatchKey {
             if (size > 1) {
                 // don't let list get too big
                 if (size >= MAX_EVENT_LIST_SIZE) {
-                    kind = StandardWatchEventKind.OVERFLOW;
+                    kind = OVERFLOW;
                     context = null;
                 }
 
@@ -148,7 +152,7 @@ abstract class AbstractWatchKey extends WatchKey {
     /**
      * WatchEvent implementation
      */
-    private static class Event<T> extends WatchEvent<T> {
+    private static class Event<T> implements WatchEvent<T> {
         private final WatchEvent.Kind<T> kind;
         private final T context;
 

@@ -1,7 +1,11 @@
 package com.barbarysoftware.watchservice;
 
-/**
- * Created by rroeser on 7/10/15.
- */
-public class MacOSXWatchServiceFactory {
+import java.nio.file.WatchService;
+
+public final class MacOSXWatchServiceFactory {
+    private MacOSXWatchServiceFactory() {}
+
+    public static WatchService newWatchService() {
+        return new MacOSXListeningWatchService();
+    }
 }

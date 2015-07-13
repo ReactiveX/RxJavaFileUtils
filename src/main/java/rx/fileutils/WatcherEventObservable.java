@@ -1,5 +1,7 @@
 package rx.fileutils;
 
+import com.barbarysoftware.watchservice.MacOSXWatchServiceFactory;
+import com.barbarysoftware.watchservice.WatchableFile;
 import com.sun.nio.file.SensitivityWatchEventModifier;
 import rx.Observable;
 import rx.Scheduler;
@@ -7,11 +9,12 @@ import rx.Subscriber;
 import rx.schedulers.Schedulers;
 
 import java.io.IOException;
-import java.lang.Exception;import java.lang.Override;import java.lang.RuntimeException;import java.lang.System;import java.lang.Throwable;import java.nio.file.FileSystems;
+import java.nio.file.FileSystems;
 import java.nio.file.Path;
 import java.nio.file.WatchEvent;
 import java.nio.file.WatchKey;
 import java.nio.file.WatchService;
+import java.util.HashMap;
 import java.util.Map;
 
 import static java.nio.file.StandardWatchEventKinds.OVERFLOW;
@@ -20,6 +23,13 @@ import static java.nio.file.StandardWatchEventKinds.OVERFLOW;
  * Created by rroeser on 7/8/15.
  */
 public class WatcherEventObservable extends Observable<WatchEvent<?>> {
+
+    private static final boolean IS_MAC;
+
+    static {
+        String os = System.getProperty("os.name").toLowerCase();
+        IS_MAC = os.contains("mac");
+    }
 
     protected WatcherEventOnSubscribe watcherEventOnSubscribe;
 
@@ -30,14 +40,32 @@ public class WatcherEventObservable extends Observable<WatchEvent<?>> {
 
         private volatile boolean close = false;
 
+        public void addPath(Path path, WatchEvent.Kind... kinds) throws Exception {
+            if (IS_MAC) {
+                final WatchableFile watchableFile = new WatchableFile(path);
+                watchableFile.register(watcher, kinds);
+            } else {
+                path.register(watcher, kinds, SensitivityWatchEventModifier.HIGH);
+            }
+        }
+
         public WatcherEventOnSubscribe(Map<Path, WatchEvent.Kind[]> paths, Scheduler scheduler) {
             try {
-                this.watcher = FileSystems.getDefault().newWatchService();
+                if (IS_MAC) {
+                    this.watcher = MacOSXWatchServiceFactory.newWatchService();
 
-                for (Path path : paths.keySet()) {
-                    path.register(watcher, paths.get(path), SensitivityWatchEventModifier.HIGH);
+                    for (Path path : paths.keySet()) {
+                        final WatchableFile watchableFile = new WatchableFile(path);
+                        watchableFile.register(watcher, paths.get(path));
+                    }
                 }
+                else {
+                    this.watcher = FileSystems.getDefault().newWatchService();
 
+                    for (Path path : paths.keySet()) {
+                        path.register(watcher, paths.get(path), SensitivityWatchEventModifier.HIGH);
+                    }
+                }
                 this.scheduler = scheduler;
             } catch (IOException e) {
                 throw new RuntimeException(e);
@@ -54,7 +82,6 @@ public class WatcherEventObservable extends Observable<WatchEvent<?>> {
                 do {
                     try {
                         WatchKey key = watcher.take();
-
                         if (key == null) {
                             continue;
                         }
@@ -62,17 +89,13 @@ public class WatcherEventObservable extends Observable<WatchEvent<?>> {
                         for (WatchEvent<?> event : key.pollEvents()) {
                             WatchEvent.Kind<?> kind = event.kind();
 
-                            System.out.println("Get event => " + kind.name());
-
                             if (kind == OVERFLOW) {
                                 continue;
                             } else {
                                 subscriber.onNext(event);
                             }
                         }
-
                         if (!key.reset()) {
-                            System.out.println("Didn't reset to closing loop");
                             close();
                         }
                     } catch (Throwable t) {
@@ -111,7 +134,10 @@ public class WatcherEventObservable extends Observable<WatchEvent<?>> {
             WatcherEventObservable watcherEventObservable
                 = new WatcherEventObservable(watcherEventOnSubscribe);
 
-            watcherEventObservable.doOnUnsubscribe(watcherEventOnSubscribe::close);
+            watcherEventObservable
+                .doOnSubscribe(() -> {
+                })
+                .doOnUnsubscribe(watcherEventOnSubscribe::close);
 
             return watcherEventObservable;
         } catch (Exception e) {
@@ -122,6 +148,25 @@ public class WatcherEventObservable extends Observable<WatchEvent<?>> {
     public static WatcherEventObservable create(Map<Path, WatchEvent.Kind[]> paths) {
         return create(paths, Schedulers.newThread());
     }
+
+    public static WatcherEventObservable create(Path path, WatchEvent.Kind... kinds) {
+        Map<Path, WatchEvent.Kind[]> paths = new HashMap<>();
+
+        paths.put(path, kinds);
+
+        return create(paths);
+    }
+
+    public WatcherEventObservable addPath(Path path, WatchEvent.Kind... kinds) {
+        try {
+            watcherEventOnSubscribe.addPath(path, kinds);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+
+        return this;
+    }
+
 
     public void close() {
         watcherEventOnSubscribe.close();
