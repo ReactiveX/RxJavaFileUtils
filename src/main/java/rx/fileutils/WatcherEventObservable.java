@@ -24,7 +24,7 @@ import static java.nio.file.StandardWatchEventKinds.OVERFLOW;
  */
 public class WatcherEventObservable extends Observable<WatchEvent<?>> {
 
-    private static final boolean IS_MAC;
+    static final boolean IS_MAC;
 
     static {
         String os = System.getProperty("os.name").toLowerCase();

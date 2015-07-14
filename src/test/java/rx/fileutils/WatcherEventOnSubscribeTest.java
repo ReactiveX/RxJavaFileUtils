@@ -59,7 +59,7 @@ public class WatcherEventOnSubscribeTest {
 
         TestSubscriber subscriber = new TestSubscriber();
 
-        CountDownLatch latch = new CountDownLatch(3);
+        CountDownLatch latch = new CountDownLatch(WatcherEventObservable.IS_MAC ? 3 : 2);
         watcherEventObservable
             .doOnNext(a -> {
                 latch.countDown();
@@ -68,7 +68,6 @@ public class WatcherEventOnSubscribeTest {
                 System.out.println("Got an event for " + kind.name());
 
             })
-            .count()
             .subscribe(subscriber);
 
         boolean closed = watcherEventObservable.isClosed();
@@ -93,6 +92,11 @@ public class WatcherEventOnSubscribeTest {
 
         Assert.assertTrue(closed);
 
-        subscriber.assertValue(3);
+        if (WatcherEventObservable.IS_MAC) {
+            subscriber.assertValueCount(3);
+        } else {
+            subscriber.assertValueCount(2);
+        }
+
     }
 }
