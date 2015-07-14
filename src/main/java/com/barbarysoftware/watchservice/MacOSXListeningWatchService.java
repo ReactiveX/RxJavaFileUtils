@@ -147,21 +147,21 @@ class MacOSXListeningWatchService extends AbstractWatchService {
 
                 for (File file : createdFiles) {
                     if (watchKey.isReportCreateEvents()) {
-                        watchKey.signalEvent(ENTRY_CREATE, file);
+                        watchKey.signalEvent(ENTRY_CREATE, file.toPath());
                     }
                     lastModifiedMap.put(file, file.lastModified());
                 }
 
                 for (File file : modifiedFiles) {
                     if (watchKey.isReportModifyEvents()) {
-                        watchKey.signalEvent(ENTRY_MODIFY, file);
+                        watchKey.signalEvent(ENTRY_MODIFY, file.toPath());
                     }
                     lastModifiedMap.put(file, file.lastModified());
                 }
 
                 for (File file : deletedFiles) {
                     if (watchKey.isReportDeleteEvents()) {
-                        watchKey.signalEvent(ENTRY_DELETE, file);
+                        watchKey.signalEvent(ENTRY_DELETE, file.toPath());
                     }
                     lastModifiedMap.remove(file);
                 }
