@@ -4,7 +4,7 @@ File utility operators for [RxJava](https://github.com/ReactiveX/RxJava).
 
 ## Master Build Status
 
-<a href='https://travis-ci.org/ReactiveX/RxJavaFileUtils/builds'><img src='https://travis-ci.org/ReactiveX/RxJavaFileUtils.svg?branch=0.x'></a>
+<a href='https://travis-ci.org/ReactiveX/RxJavaFileUtils/builds'><img src='https://travis-ci.org/ReactiveX/RxJavaFileUtils.svg?branch=master'></a>
 
 ## Communication
 
