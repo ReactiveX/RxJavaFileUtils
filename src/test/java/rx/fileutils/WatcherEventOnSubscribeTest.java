@@ -16,6 +16,7 @@ import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
+import rx.Subscription;
 import rx.observers.TestSubscriber;
 
 import java.io.File;
@@ -24,6 +25,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardWatchEventKinds;
 import java.nio.file.WatchEvent;
 import java.util.HashMap;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 
@@ -72,17 +74,18 @@ public class WatcherEventOnSubscribeTest {
         TestSubscriber subscriber = new TestSubscriber();
 
         CountDownLatch latch = new CountDownLatch(WatcherEventObservable.IS_MAC ? 3 : 2);
-        watcherEventObservable
+        Subscription subscribe = watcherEventObservable
+            .filter(Optional::isPresent)
             .doOnNext(a -> {
                 latch.countDown();
-                WatchEvent.Kind<?> kind = a.kind();
+                WatchEvent.Kind<?> kind = a.get().kind();
 
                 System.out.println("Got an event for " + kind.name());
 
             })
             .subscribe(subscriber);
 
-        boolean closed = watcherEventObservable.isClosed();
+        boolean closed = subscribe.isUnsubscribed();
 
         Assert.assertFalse(closed);
 
@@ -98,9 +101,9 @@ public class WatcherEventOnSubscribeTest {
 
         latch.await();
 
-        watcherEventObservable.close();
+        subscribe.unsubscribe();
 
-        closed = watcherEventObservable.isClosed();
+        closed = subscribe.isUnsubscribed();
 
         Assert.assertTrue(closed);
 

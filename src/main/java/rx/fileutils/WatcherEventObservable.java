@@ -28,13 +28,11 @@ import java.nio.file.WatchKey;
 import java.nio.file.WatchService;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 
 import static java.nio.file.StandardWatchEventKinds.OVERFLOW;
 
-/**
- * Created by rroeser on 7/8/15.
- */
-public class WatcherEventObservable extends Observable<WatchEvent<?>> {
+public class WatcherEventObservable extends Observable<Optional<WatchEvent<Path>>> {
 
     static final boolean IS_MAC;
 
@@ -45,7 +43,7 @@ public class WatcherEventObservable extends Observable<WatchEvent<?>> {
 
     protected WatcherEventOnSubscribe watcherEventOnSubscribe;
 
-    private static class WatcherEventOnSubscribe implements OnSubscribe<WatchEvent<?>> {
+    private static class WatcherEventOnSubscribe implements OnSubscribe<Optional<WatchEvent<Path>>> {
         private WatchService watcher;
 
         private Scheduler scheduler;
@@ -85,8 +83,7 @@ public class WatcherEventObservable extends Observable<WatchEvent<?>> {
         }
 
         @Override
-        public void call(Subscriber<? super WatchEvent<?>> subscriber) {
-
+        public void call(Subscriber<? super Optional<WatchEvent<Path>>> subscriber) {
             Scheduler.Worker worker = scheduler.createWorker();
             subscriber.add(worker);
 
@@ -99,14 +96,16 @@ public class WatcherEventObservable extends Observable<WatchEvent<?>> {
                         }
 
                         for (WatchEvent<?> event : key.pollEvents()) {
-                            WatchEvent.Kind<?> kind = event.kind();
+                            final WatchEvent.Kind<?> kind = event.kind();
 
-                            if (kind == OVERFLOW) {
-                                continue;
-                            } else {
-                                subscriber.onNext(event);
-                            }
+                            Optional<WatchEvent<Path>> o =
+                                kind == OVERFLOW
+                                    ? Optional.empty()
+                                    : Optional.of((WatchEvent<Path>) event);
+
+                            subscriber.onNext(o);
                         }
+
                         if (!key.reset()) {
                             close();
                         }
@@ -127,9 +126,6 @@ public class WatcherEventObservable extends Observable<WatchEvent<?>> {
             } catch (Exception e) {}
         }
 
-        public boolean isClosed() {
-            return close;
-        }
     }
 
     protected WatcherEventObservable(WatcherEventOnSubscribe subscribe) {
@@ -147,8 +143,6 @@ public class WatcherEventObservable extends Observable<WatchEvent<?>> {
                 = new WatcherEventObservable(watcherEventOnSubscribe);
 
             watcherEventObservable
-                .doOnSubscribe(() -> {
-                })
                 .doOnUnsubscribe(watcherEventOnSubscribe::close);
 
             return watcherEventObservable;
@@ -177,14 +171,5 @@ public class WatcherEventObservable extends Observable<WatchEvent<?>> {
         }
 
         return this;
-    }
-
-
-    public void close() {
-        watcherEventOnSubscribe.close();
-    }
-
-    public boolean isClosed() {
-        return watcherEventOnSubscribe.isClosed();
     }
 }
