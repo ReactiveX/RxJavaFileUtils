@@ -16,20 +16,20 @@ import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
+import rx.Observable;
 import rx.Subscription;
 import rx.observers.TestSubscriber;
+import rx.schedulers.Schedulers;
 
 import java.io.File;
 import java.io.FileWriter;
 import java.nio.file.Path;
-import java.nio.file.StandardWatchEventKinds;
-import java.nio.file.WatchEvent;
 import java.util.HashMap;
-import java.util.Optional;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 
-public class WatcherEventOnSubscribeTest {
+public class FileSystemEventOnSubscribeTest {
     private static final String testDirPath = "/tmp/testDirPath-" + UUID.randomUUID().toString();
 
     private static File dir;
@@ -63,22 +63,26 @@ public class WatcherEventOnSubscribeTest {
 
     @Test(timeout = 15_000)
     public void testWatchForFileCreateAndModify() throws Exception {
-        HashMap<Path, WatchEvent.Kind[]> paths = new HashMap<>();
+        Map<Path, FileSystemEventKind[]> paths = new HashMap<>();
 
-        paths.put(dir.toPath(), new WatchEvent.Kind[] {
-            StandardWatchEventKinds.ENTRY_CREATE,
-            StandardWatchEventKinds.ENTRY_MODIFY } );
+        paths.put(dir.toPath(), new FileSystemEventKind[] {
+            FileSystemEventKind.ENTRY_CREATE,
+            FileSystemEventKind.ENTRY_MODIFY } );
 
-        WatcherEventObservable watcherEventObservable = WatcherEventObservable.create(paths);
+        Observable<FileSystemEvent> fileSystemWatcher =
+            FileSystemWatcher
+                .newBuilder()
+                .addPaths(paths)
+                .withScheduler(Schedulers.io())
+                .build();
 
         TestSubscriber subscriber = new TestSubscriber();
 
-        CountDownLatch latch = new CountDownLatch(WatcherEventObservable.IS_MAC ? 3 : 2);
-        Subscription subscribe = watcherEventObservable
-            .filter(Optional::isPresent)
+        CountDownLatch latch = new CountDownLatch(FileSystemWatcher.IS_MAC ? 3 : 2);
+        Subscription subscribe = fileSystemWatcher
             .doOnNext(a -> {
                 latch.countDown();
-                WatchEvent.Kind<?> kind = a.get().kind();
+                FileSystemEventKind kind = a.getFileSystemEventKind();
 
                 System.out.println("Got an event for " + kind.name());
 
@@ -107,7 +111,7 @@ public class WatcherEventOnSubscribeTest {
 
         Assert.assertTrue(closed);
 
-        if (WatcherEventObservable.IS_MAC) {
+        if (FileSystemWatcher.IS_MAC) {
             subscriber.assertValueCount(3);
         } else {
             subscriber.assertValueCount(2);

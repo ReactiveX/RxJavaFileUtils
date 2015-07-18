@@ -28,11 +28,8 @@ import java.nio.file.WatchKey;
 import java.nio.file.WatchService;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Optional;
 
-import static java.nio.file.StandardWatchEventKinds.OVERFLOW;
-
-public class WatcherEventObservable extends Observable<Optional<WatchEvent<Path>>> {
+public final class FileSystemWatcher {
 
     static final boolean IS_MAC;
 
@@ -41,39 +38,32 @@ public class WatcherEventObservable extends Observable<Optional<WatchEvent<Path>
         IS_MAC = os.contains("mac");
     }
 
-    protected WatcherEventOnSubscribe watcherEventOnSubscribe;
+    private FileSystemWatcher() {}
 
-    private static class WatcherEventOnSubscribe implements OnSubscribe<Optional<WatchEvent<Path>>> {
+    private static class FileSystemEventOnSubscribe implements Observable.OnSubscribe<FileSystemEvent> {
         private WatchService watcher;
 
         private Scheduler scheduler;
 
         private volatile boolean close = false;
 
-        public void addPath(Path path, WatchEvent.Kind... kinds) throws Exception {
-            if (IS_MAC) {
-                final WatchableFile watchableFile = new WatchableFile(path);
-                watchableFile.register(watcher, kinds);
-            } else {
-                path.register(watcher, kinds, SensitivityWatchEventModifier.HIGH);
-            }
-        }
-
-        public WatcherEventOnSubscribe(Map<Path, WatchEvent.Kind[]> paths, Scheduler scheduler) {
+        public FileSystemEventOnSubscribe(Map<Path, FileSystemEventKind[]> paths, Scheduler scheduler) {
             try {
                 if (IS_MAC) {
                     this.watcher = MacOSXWatchServiceFactory.newWatchService();
 
                     for (Path path : paths.keySet()) {
                         final WatchableFile watchableFile = new WatchableFile(path);
-                        watchableFile.register(watcher, paths.get(path));
+                        FileSystemEventKind[] kinds = paths.get(path);
+                        watchableFile.register(watcher, FileSystemEventKind.toWatchEventKinds(kinds));
                     }
                 }
                 else {
                     this.watcher = FileSystems.getDefault().newWatchService();
 
                     for (Path path : paths.keySet()) {
-                        path.register(watcher, paths.get(path), SensitivityWatchEventModifier.HIGH);
+                        FileSystemEventKind[] kinds = paths.get(path);
+                        path.register(watcher, FileSystemEventKind.toWatchEventKinds(kinds), SensitivityWatchEventModifier.HIGH);
                     }
                 }
                 this.scheduler = scheduler;
@@ -83,7 +73,7 @@ public class WatcherEventObservable extends Observable<Optional<WatchEvent<Path>
         }
 
         @Override
-        public void call(Subscriber<? super Optional<WatchEvent<Path>>> subscriber) {
+        public void call(Subscriber<? super FileSystemEvent> subscriber) {
             Scheduler.Worker worker = scheduler.createWorker();
             subscriber.add(worker);
 
@@ -96,14 +86,8 @@ public class WatcherEventObservable extends Observable<Optional<WatchEvent<Path>
                         }
 
                         for (WatchEvent<?> event : key.pollEvents()) {
-                            final WatchEvent.Kind<?> kind = event.kind();
-
-                            Optional<WatchEvent<Path>> o =
-                                kind == OVERFLOW
-                                    ? Optional.empty()
-                                    : Optional.of((WatchEvent<Path>) event);
-
-                            subscriber.onNext(o);
+                            FileSystemEvent fileSystemEvent = new FileSystemEvent(event);
+                            subscriber.onNext(fileSystemEvent);
                         }
 
                         if (!key.reset()) {
@@ -128,48 +112,51 @@ public class WatcherEventObservable extends Observable<Optional<WatchEvent<Path>
 
     }
 
-    protected WatcherEventObservable(WatcherEventOnSubscribe subscribe) {
-        super(subscribe);
+    public static class Builder {
+        private Map<Path, FileSystemEventKind[]> paths = new HashMap<>();
 
-        this.watcherEventOnSubscribe = subscribe;
-    }
+        private Scheduler scheduler = Schedulers.newThread();
 
-    public static WatcherEventObservable create(Map<Path, WatchEvent.Kind[]> paths, Scheduler scheduler) {
-        try {
-            WatcherEventOnSubscribe watcherEventOnSubscribe
-                = new WatcherEventOnSubscribe(paths, scheduler);
+        Builder() {}
 
-            WatcherEventObservable watcherEventObservable
-                = new WatcherEventObservable(watcherEventOnSubscribe);
+        public Builder addPath(Path path, FileSystemEventKind... kinds) {
+            paths.put(path, kinds);
 
-            watcherEventObservable
-                .doOnUnsubscribe(watcherEventOnSubscribe::close);
-
-            return watcherEventObservable;
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    public static WatcherEventObservable create(Map<Path, WatchEvent.Kind[]> paths) {
-        return create(paths, Schedulers.newThread());
-    }
-
-    public static WatcherEventObservable create(Path path, WatchEvent.Kind... kinds) {
-        Map<Path, WatchEvent.Kind[]> paths = new HashMap<>();
-
-        paths.put(path, kinds);
-
-        return create(paths);
-    }
-
-    public WatcherEventObservable addPath(Path path, WatchEvent.Kind... kinds) {
-        try {
-            watcherEventOnSubscribe.addPath(path, kinds);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
+            return this;
         }
 
-        return this;
+        public Builder addPaths(Map<Path, FileSystemEventKind[]> paths) {
+            this.paths.putAll(paths);
+
+            return this;
+        }
+
+        public Builder withScheduler(Scheduler scheduler) {
+            this.scheduler = scheduler;
+
+            return this;
+        }
+
+        public Observable<FileSystemEvent> build() {
+            try {
+                FileSystemEventOnSubscribe fileSystemEventOnSubscribe
+                    = new FileSystemEventOnSubscribe(paths, scheduler);
+
+                Observable<FileSystemEvent> fileSystemEventObservable
+                    = Observable.create(fileSystemEventOnSubscribe);
+
+                fileSystemEventObservable
+                    .doOnUnsubscribe(fileSystemEventOnSubscribe::close);
+
+                return fileSystemEventObservable;
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        }
+
+    }
+
+    public static Builder newBuilder() {
+        return new Builder();
     }
 }
