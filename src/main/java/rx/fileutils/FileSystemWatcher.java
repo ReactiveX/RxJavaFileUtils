@@ -21,13 +21,11 @@ import rx.Subscriber;
 import rx.schedulers.Schedulers;
 
 import java.io.IOException;
-import java.nio.file.FileSystems;
-import java.nio.file.Path;
-import java.nio.file.WatchEvent;
-import java.nio.file.WatchKey;
-import java.nio.file.WatchService;
-import java.util.HashMap;
-import java.util.Map;
+import java.nio.file.*;
+import java.nio.file.attribute.BasicFileAttributes;
+import java.util.*;
+
+import static java.nio.file.StandardWatchEventKinds.ENTRY_CREATE;
 
 public final class FileSystemWatcher {
 
@@ -42,12 +40,24 @@ public final class FileSystemWatcher {
 
     private static class FileSystemEventOnSubscribe implements Observable.OnSubscribe<FileSystemEvent> {
         private WatchService watcher;
-
         private Scheduler scheduler;
-
         private volatile boolean close = false;
+        private final Set<Path> watchedPaths;
 
-        public FileSystemEventOnSubscribe(Map<Path, FileSystemEventKind[]> paths, Scheduler scheduler) {
+        public FileSystemEventOnSubscribe(
+            Map<Path, FileSystemEventKind[]> paths,
+            Scheduler scheduler,
+            boolean scanCurrentFs
+        ) {
+            watchedPaths = new HashSet<Path>();
+            if (scanCurrentFs) {
+                paths.forEach((path, kind) -> {
+                    if (Arrays.asList(kind).contains(FileSystemEventKind.ENTRY_CREATE)) {
+                        watchedPaths.add(path);
+                    }
+                });
+            }
+
             try {
                 if (IS_MAC) {
                     this.watcher = MacOSXWatchServiceFactory.newWatchService();
@@ -72,8 +82,20 @@ public final class FileSystemWatcher {
             }
         }
 
+        public FileSystemEventOnSubscribe(Map<Path, FileSystemEventKind[]> paths, Scheduler scheduler) {
+            this(paths, scheduler, false);
+        }
+
         @Override
         public void call(Subscriber<? super FileSystemEvent> subscriber) {
+            // scan the watchedPaths and trigger fake ENTRY_CREATE events
+            watchedPaths.forEach(path -> {
+                getEventsForCurrentFiles(path).forEach(event -> {
+                    FileSystemEvent fileSystemEvent = new FileSystemEvent(event);
+                    subscriber.onNext(fileSystemEvent);
+                });
+            });
+
             Scheduler.Worker worker = scheduler.createWorker();
             subscriber.add(worker);
 
@@ -110,12 +132,49 @@ public final class FileSystemWatcher {
             } catch (Exception e) {}
         }
 
+        /**
+         * Return fake ENTRY_CREATE events for the current files.
+         * This simplify the code by treating current files the same way as new files.
+         */
+        private List<WatchEvent<Path>> getEventsForCurrentFiles(Path directory) {
+            final List<WatchEvent<Path>> events = new ArrayList<>();
+            try {
+                Files.walkFileTree(directory, new SimpleFileVisitor<Path>() {
+                    @Override
+                    public FileVisitResult visitFile(Path path, BasicFileAttributes attrs) {
+                        events.add(new WatchEvent<Path>() {
+                            @Override
+                            public Kind<Path> kind() {
+                                return ENTRY_CREATE;
+                            }
+
+                            @Override
+                            public int count() {
+                                return 1;
+                            }
+
+                            @Override
+                            public Path context() {
+                                return path;
+                            }
+                        });
+                        return FileVisitResult.CONTINUE;
+                    }
+                });
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+
+            return events;
+        }
     }
 
     public static class Builder {
         private Map<Path, FileSystemEventKind[]> paths = new HashMap<>();
 
         private Scheduler scheduler = Schedulers.newThread();
+
+        private boolean scanCurrentFS = false;
 
         Builder() {}
 
@@ -137,10 +196,16 @@ public final class FileSystemWatcher {
             return this;
         }
 
+        public Builder withCurrentFsScanning(boolean enable) {
+            this.scanCurrentFS = enable;
+
+            return this;
+        }
+
         public Observable<FileSystemEvent> build() {
             try {
                 FileSystemEventOnSubscribe fileSystemEventOnSubscribe
-                    = new FileSystemEventOnSubscribe(paths, scheduler);
+                    = new FileSystemEventOnSubscribe(paths, scheduler, scanCurrentFS);
 
                 Observable<FileSystemEvent> fileSystemEventObservable
                     = Observable.create(fileSystemEventOnSubscribe);
