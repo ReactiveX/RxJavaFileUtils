@@ -142,22 +142,13 @@ public final class FileSystemWatcher {
                 Files.walkFileTree(directory, new SimpleFileVisitor<Path>() {
                     @Override
                     public FileVisitResult visitFile(Path path, BasicFileAttributes attrs) {
-                        events.add(new WatchEvent<Path>() {
-                            @Override
-                            public Kind<Path> kind() {
-                                return ENTRY_CREATE;
-                            }
+                        events.add(pathToWatchEvent(path));
+                        return FileVisitResult.CONTINUE;
+                    }
 
-                            @Override
-                            public int count() {
-                                return 1;
-                            }
-
-                            @Override
-                            public Path context() {
-                                return path;
-                            }
-                        });
+                    @Override
+                    public FileVisitResult preVisitDirectory(Path path, BasicFileAttributes attrs) {
+                        events.add(pathToWatchEvent(path));
                         return FileVisitResult.CONTINUE;
                     }
                 });
@@ -166,6 +157,25 @@ public final class FileSystemWatcher {
             }
 
             return events;
+        }
+
+        private WatchEvent<Path> pathToWatchEvent(Path path) {
+            return new WatchEvent<Path>() {
+                @Override
+                public Kind<Path> kind() {
+                    return ENTRY_CREATE;
+                }
+
+                @Override
+                public int count() {
+                    return 1;
+                }
+
+                @Override
+                public Path context() {
+                    return path;
+                }
+            };
         }
     }
 
