@@ -110,10 +110,12 @@ class MacOSXListeningWatchService extends AbstractWatchService {
 
     private static Set<File> recursiveListFiles(File file) {
         Set<File> files = new HashSet<File>();
-        files.add(file);
-        if (file.isDirectory()) {
-            for (File child : file.listFiles()) {
-                files.addAll(recursiveListFiles(child));
+        if (file != null) {
+            files.add(file);
+            if (file.isDirectory()) {
+                for (File child : file.listFiles()) {
+                    files.addAll(recursiveListFiles(child));
+                }
             }
         }
         return files;
