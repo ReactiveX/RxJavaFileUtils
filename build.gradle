@@ -1,11 +1,11 @@
 buildscript {
   repositories { jcenter() }
-  dependencies { classpath 'com.netflix.nebula:gradle-rxjava-project-plugin:2.2.3' }
+  dependencies { classpath 'com.netflix.nebula:gradle-rxjava-project-plugin:4.0.0' }
 }
 
 description = 'File utilities using RxJava'
 
-apply plugin: 'rxjava-project'
+apply plugin: 'nebula.rxjava-project'
 apply plugin: 'java'
 
 sourceCompatibility = JavaVersion.VERSION_1_8
